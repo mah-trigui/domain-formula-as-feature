@@ -4,7 +4,7 @@ A machine learning project showing how a first-principles analytical estimate ca
 
 ## Project Website
 
-[View Project Site](https://YOUR_USERNAME.github.io/domain-formula-as-feature/)
+[View Project Site](https://mah-trigui.github.io/domain-formula-as-feature/)
 
 ## Overview
 
