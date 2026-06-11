@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Use the Domain Formula as a Feature</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="container">
+      <h1>Use the Domain Formula as a Feature</h1>
+      <p class="subtitle">
+        Hybrid analytical-ML modeling for delivery time prediction
+      </p>
+      <div class="hero-buttons">
+        <a href="https://github.com/mah-trigui/domain-formula-as-feature" class="btn primary">View Repository</a>
+        <a href="#idea" class="btn secondary">Explore Method</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="section">
+      <div class="container">
+        <h2>Overview</h2>
+        <p>
+          This project predicts delivery time for a logistics platform in Nairobi. The key modeling decision was not to choose between a hand-crafted domain formula and a machine learning model, but to combine both.
+        </p>
+        <p>
+          A first-principles estimate of duration was constructed from route distance and rider historical speed. Instead of using that estimate as the final prediction, it was fed into XGBoost as a feature. The model then learned the correction from contextual variables such as pickup delay, geography, rider history, and time-of-day effects.
+        </p>
+        <p>
+          The result is a hybrid analytical-ML design: the formula provides a structured prior, and the model learns where reality systematically deviates from that prior.
+        </p>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="container">
+        <h2>Architecture</h2>
+        <img src="images/architecture.jpg" alt="Hybrid analytical-ML modeling diagram" class="architecture-image" />
+
+        <details style="margin-top: 30px;">
+          <summary style="cursor: pointer; font-weight: bold; color: #0c5adb; font-size: 1.1rem;">
+            📋 View detailed text-based architecture diagram
+          </summary>
+          <pre style="margin-top: 15px;">
+                  ┌─────────────────────────────────────┐
+                  │  Raw Delivery Context              │
+                  │  - distance                        │
+                  │  - rider history                   │
+                  │  - pickup / arrival timestamps     │
+                  │  - location coordinates            │
+                  └────────────────┬────────────────────┘
+                                   │
+                                   ▼
+               ┌────────────────────────────────────────────┐
+               │ Analytical Baseline Construction           │
+               │ expected_duration ≈ distance / rider_speed │
+               └────────────────┬───────────────────────────┘
+                                │
+                                ▼
+               ┌────────────────────────────────────────────┐
+               │ Baseline-Derived Features                  │
+               │ - dur_estim                                │
+               │ - dur_estim_avg                            │
+               │ - dur_nor                                  │
+               │ - imp                                      │
+               └────────────────┬───────────────────────────┘
+                                │
+          ┌─────────────────────┼──────────────────────────────┐
+          ▼                     ▼                              ▼
+┌──────────────────┐  ┌────────────────────┐      ┌────────────────────┐
+│ Rider Priors     │  │ Geographic Context │      │ Operational Timing │
+│ - speed_med      │  │ - pickup clusters  │      │ - plac_confir      │
+│ - speed_avg      │  │ - dest clusters    │      │ - confir_arriv     │
+│ - best_rider     │  │ - haversine        │      │ - arriv_pick       │
+└─────────┬────────┘  └──────────┬─────────┘      └──────────┬─────────┘
+          └──────────────────────┴────────────────────────────┘
+                                 │
+                                 ▼
+                    ┌────────────────────────────┐
+                    │      XGBoost Regressor     │
+                    │  learns residual structure │
+                    └──────────────┬─────────────┘
+                                   │
+                                   ▼
+                    ┌────────────────────────────┐
+                    │ Final Delivery Time Pred.  │
+                    │ formula prior + correction │
+                    └────────────────────────────┘
+          </pre>
+        </details>
+      </div>
+    </section>
+
+    <section class="section" id="idea">
+      <div class="container">
+        <h2>The Core Idea</h2>
+        <p>
+          In many applied regression problems, part of the target can already be approximated using domain logic. In this case, travel duration can be roughly estimated from distance and rider historical speed.
+        </p>
+        <p>
+          The key decision was to avoid two common extremes:
+        </p>
+        <ul class="clean-list">
+          <li>using the formula alone as the final prediction</li>
+          <li>ignoring the formula and forcing the model to learn that relationship from scratch</li>
+        </ul>
+        <p>
+          Instead, the analytical estimate was treated as a structured baseline and injected into the feature space. This shifts the learner’s role: rather than modeling everything from zero, it focuses on residual variation caused by traffic, local geography, pickup friction, rider differences, and operational noise.
+        </p>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="container">
+        <h2>Analytical Baseline Features</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Estimated Duration</h3>
+            <p>
+              A baseline duration estimate was computed from route distance and rider median speed, creating a first-principles approximation of travel time.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Normalized Duration</h3>
+            <p>
+              The baseline estimate was combined with median rider pickup behavior to create a more realistic operational duration proxy.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Improvement Ratio</h3>
+            <p>
+              Ratio-based features were added to express how much a given order deviates from what would normally be expected from the rider’s historical pattern.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2>Broader Feature Engineering</h2>
+        <p>
+          The hybrid baseline was only one part of a richer feature space built around rider behavior, geography, and operational timing.
+        </p>
+        <ul class="clean-list">
+          <li><strong>Rider priors:</strong> median speed, average speed, historical duration, distance statistics, quality scores, and error flags</li>
+          <li><strong>Geographic abstraction:</strong> K-means clustering on pickup and destination coordinates, followed by nearest-centroid assignment</li>
+          <li><strong>Operational timing:</strong> time differences between placement, confirmation, arrival at pickup, and pickup</li>
+          <li><strong>Distance consistency:</strong> haversine and route-based distance comparisons</li>
+          <li><strong>Binned variables:</strong> distance, hour, rider age, rider order volume, speed profile, and score profile</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="container">
+        <h2>Selected Code Snippets</h2>
+
+        <h3>1. Building the analytical baseline</h3>
+        <pre>
+library(dplyr)
+
+df <- df %>%
+  mutate(
+    speed_med = pmin(speed_med, 48),
+    arriv_pick_med = pmin(arriv_pick_med, 528),
+    dis = ((dist / 1000) + Distance__KM_) / 2,
+    dur_estim = dis / speed_med * 3600,
+    dur_estim_avg = dis / speed_avg * 3600,
+    dur_nor = arriv_pick_med + dur_estim,
+    imp = dur_nor / arriv_pick
+  )
+        </pre>
+
+        <h3>2. Rider performance priors</h3>
+        <pre>
+rider_stats <- train %>%
+  group_by(Rider_Id) %>%
+  summarise(
+    speed_avg = mean(speed, na.rm = TRUE),
+    speed_med = median(speed, na.rm = TRUE),
+    arriv_pick_med = median(arriv_pick, na.rm = TRUE),
+    dist_avg = mean(Distance__KM_, na.rm = TRUE),
+    dist_med = median(Distance__KM_, na.rm = TRUE),
+    dur_avg = mean(Time_from_Pickup_to_Arrival, na.rm = TRUE),
+    dur_med = median(Time_from_Pickup_to_Arrival, na.rm = TRUE),
+    Nb_ord = n(),
+    .groups = "drop"
+  )
+        </pre>
+
+        <h3>3. Geographic clustering</h3>
+        <pre>
+set.seed(123)
+
+location <- bind_rows(
+  train %>% transmute(lat = Pickup_Lat, long = Pickup_Long),
+  train %>% transmute(lat = Destination_Lat, long = Destination_Long)
+) %>%
+  distinct()
+
+k_model <- kmeans(location, centers = 10)
+
+train$class_pick_10 <- factor(
+  FNN::get.knnx(k_model$centers, train[, c("Pickup_Lat", "Pickup_Long")], 1)$nn.index[, 1]
+)
+
+train$class_dest_10 <- factor(
+  FNN::get.knnx(k_model$centers, train[, c("Destination_Lat", "Destination_Long")], 1)$nn.index[, 1]
+)
+        </pre>
+
+        <h3>4. XGBoost feature subset</h3>
+        <pre>
+feature_cols <- c(
+  "Distance__KM_", "d_haver", "P_diff_dist",
+  "plac_confir", "confir_arriv", "arriv_pick",
+  "P_conf_plac", "P_arriv_conf",
+  "class_pick_10", "class_dest_10", "Hour_f",
+  "Age", "P_order_rated", "speed_med", "speed_avg",
+  "arriv_pick_med", "dur_avg", "dur_med", "score",
+  "P00", "P01", "P11", "P10",
+  "Nb_Time_miss", "Outlier_Speed_Less", "Outlier_Speed_More",
+  "dur_estim", "dur_estim_avg", "dur_nor", "imp", "imp_b"
+)
+        </pre>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2>Why this matters</h2>
+        <ul class="clean-list">
+          <li>uses domain knowledge without hard-coding the final answer</li>
+          <li>reduces the amount of structure the model has to discover from scratch</li>
+          <li>lets the learner focus on residual context and operational noise</li>
+          <li>creates a practical hybrid analytical-ML design pattern transferable to other regression problems</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="container">
+        <h2>Where this pattern generalizes</h2>
+        <p>
+          This same design pattern can be reused anywhere a reasonable analytical approximation already exists:
+        </p>
+        <ul class="clean-list">
+          <li>pricing systems with rule-based starting estimates</li>
+          <li>demand forecasting with baseline seasonality formulas</li>
+          <li>energy consumption with physical load approximations</li>
+          <li>manufacturing yield with process-based expected output</li>
+        </ul>
+        <p>
+          The principle is stable: if a formula explains part of the system, use it as structured input and let machine learning model the remainder.
+        </p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <h2>Key Takeaway</h2>
+        <div class="metric-box">
+          <p><strong>Don’t ask the model to learn what the formula already knows.</strong></p>
+          <p>
+            A domain formula can serve as a prior feature, while the model learns the part of reality that cannot be derived analytically.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section alt">
+      <div class="container">
+        <h2>Public Repository Scope</h2>
+        <p>
+          This public version focuses on the hybrid analytical-ML design pattern, selected feature engineering components, and project presentation. It does not include competition data files.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Built as a public project showcase for applied machine learning and hybrid modeling design.</p>
+    </div>
+  </footer>
+</body>
+</html>
